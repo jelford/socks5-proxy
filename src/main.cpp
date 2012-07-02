@@ -79,6 +79,7 @@ namespace socks
                 std::cerr << "Writing out auth method" << std::endl;
                 if (std::find(auth_methods.begin(), auth_methods.end(), socks::AUTH_NONE) != auth_methods.end())
                     m_connection.write(method_reply);
+                    //std::cerr << "not writing to socket... " << std::endl;
                 else
                     std::cerr << "No Auth unavailable..." << std::endl;
 

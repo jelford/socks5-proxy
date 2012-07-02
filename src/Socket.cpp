@@ -1,3 +1,4 @@
+#include <iostream>     // cerr
 
 #include <cerrno>
 #include <unistd.h>
@@ -44,12 +45,17 @@ jelford::Socket::Socket(int socket_family, int socket_type, int protocol) throw(
 
 jelford::Socket::Socket(int file_descriptor) : m_socket_descriptor(file_descriptor)
 {
+    std::cerr << file_descriptor << ": connection established" << std::endl;
+    if (file_descriptor == 0)
+    {
+        std::cerr << "oopsy! Looks like that's not a great file descriptor... (Errno: " << errno << " (which says: " << socket_get_error(errno) << ")" << std::endl;
+    }
 }
 
 jelford::Socket::Socket(Socket&& other) : m_socket_descriptor(other.m_socket_descriptor)
 {
     // Don't close it when the old Socket is de-allocated
-    other.m_socket_descriptor = 0;
+    other.m_socket_descriptor = -1;
 }
 
 void jelford::Socket::set_reuse(bool should_reuse)
@@ -72,12 +78,22 @@ void jelford::Socket::listen()
 
 jelford::Socket jelford::Socket::accept(sockaddr* addr, socklen_t* addrlen)
 {
-    return Socket(::accept(m_socket_descriptor, addr, addrlen));
+    auto fd = ::accept(m_socket_descriptor, addr, addrlen);
+    if (fd < 0 || errno != 0)
+    {
+        std::cerr << "Problem accepting connection: (" << errno << ", " << socket_get_error(errno) << ")" << std::endl;
+        throw SocketException(errno);
+    }
+    return Socket(fd);
 }
 
 jelford::Socket::~Socket()
 {
-    ::close(m_socket_descriptor);
+    if (m_socket_descriptor > 0)
+    {
+        ::close(m_socket_descriptor);
+        std::cerr << m_socket_descriptor << ": connection closed" << std::endl;
+    }
 }
 
 std::vector<unsigned char> jelford::Socket::read(size_t length)
@@ -119,5 +135,8 @@ std::vector<unsigned char> jelford::Socket::read()
 void jelford::Socket::write(std::vector<unsigned char>& data)
 {
     if (::write(m_socket_descriptor, &data[0], data.size()) < 0)
+    {
+        std::cerr << "Error: " << errno;
         throw SocketException(errno);
+    }
 }
