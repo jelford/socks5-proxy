@@ -1,4 +1,7 @@
-#include <iostream>
+
+#include <cerrno>
+#include <unistd.h>
+#include <cstring>
 
 #include "Socket.hpp"
 
@@ -41,7 +44,6 @@ jelford::Socket::Socket(int socket_family, int socket_type, int protocol) throw(
 
 jelford::Socket::Socket(int file_descriptor) : m_socket_descriptor(file_descriptor)
 {
-    std::cerr << m_socket_descriptor << " : opened socket" << std::endl;
 }
 
 jelford::Socket::Socket(Socket&& other) : m_socket_descriptor(other.m_socket_descriptor)
@@ -76,7 +78,6 @@ jelford::Socket jelford::Socket::accept(sockaddr* addr, socklen_t* addrlen)
 jelford::Socket::~Socket()
 {
     ::close(m_socket_descriptor);
-    std::cerr << m_socket_descriptor << " : closing socket" << std::endl;
 }
 
 std::vector<unsigned char> jelford::Socket::read(size_t length)
@@ -115,3 +116,8 @@ std::vector<unsigned char> jelford::Socket::read()
     return data;
 }
 
+void jelford::Socket::write(std::vector<unsigned char>& data)
+{
+    if (::write(m_socket_descriptor, &data[0], data.size()) < 0)
+        throw SocketException(errno);
+}

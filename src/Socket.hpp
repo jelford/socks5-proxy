@@ -1,19 +1,14 @@
-#include <vector>
-#include <exception>
+#ifndef JELFORD_SOCKET_HPP
+#define JELFORD_SOCKET_HPP
 
-#include <sys/types.h>
-#include <sys/socket.h>
+#include <vector>       // Use as basic datatype in place of arrays
+#include <exception>    // Because we have grown-up error handling
+
 #include <netinet/in.h>
-#include <arpa/inet.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-
 
 namespace jelford 
 {
+    
     class SocketException : public std::exception
     {   
         private:
@@ -50,5 +45,9 @@ namespace jelford
             std::vector<unsigned char> read(size_t length);
             
             std::vector<unsigned char> read();
+
+            void write(std::vector<unsigned char>& data);
     };
 }
+
+#endif
