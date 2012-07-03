@@ -34,6 +34,11 @@ const char* jelford::socket_get_error(int _errno)
     }
 }
 
+int jelford::Socket::identify()
+{
+    return m_socket_descriptor;
+}
+
 jelford::Socket::Socket(int socket_family, int socket_type, int protocol) throw(SocketException)
 {
     m_socket_descriptor = ::socket(socket_family, socket_type, protocol);

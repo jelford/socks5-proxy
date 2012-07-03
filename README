@@ -1,1 +1,5 @@
-A small project to learn C socket programming by writing a caching SOCKS5 proxy.
+A small project to learn socket programming by writing a caching SOCKS5 proxy.
+
+You can make with something like:
+
+    g++ --std=c++11 -Wall -pedantic -o socks-proxy ./src/*.cpp

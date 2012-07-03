@@ -32,6 +32,8 @@ namespace jelford
             Socket(int socket_family, int socket_type, int protocol) throw(SocketException);
             Socket(int file_descriptor);
             Socket(Socket&& other);
+    
+            int identify();
             
             void set_reuse(bool should_reuse);
             
