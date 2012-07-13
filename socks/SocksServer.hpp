@@ -11,6 +11,7 @@
 #include "state_managers/Socks5TunnelManager.hpp"
 
 #include <memory>           // std::shared_ptr, std::unique_ptr
+#include <thread>           // std::thread
 
 namespace socks
 {
@@ -48,30 +49,37 @@ namespace socks
             
             void serve()
             {
+                int open_connections = 0;
                 while(true)
                 {
                     std::cerr << "Awaiting socks request..." << std::endl;
-                    SocksSession<Socket> session(m_listen_socket.accept(NULL, NULL), 
-                                                    m_initial_state_factory);
+                    std::shared_ptr<SocksSession<Socket>> session(new SocksSession<Socket>(m_listen_socket.accept(NULL, NULL),
+                                                    m_initial_state_factory));
 
-                    /* Ooops! Assume session lasts forever and is blocking.
-                     * Should a select(), or put this in a thread (and some shutdown logic)
-                     */
-                    try
-                    {
-                        while(session.process_incoming()) {} 
-                    }
-                    catch (std::unique_ptr<SocksException>&& e)
-                    {
-                        std::cerr << "Something went terrible wrong; I'm dropping the connection and printing out the error message:\n" << e->what() << std::endl;
-                    }
-                    catch (std::unique_ptr<jelford::SocketException>&& e)
-                    {
-                        std::cerr << "Socket problem: "
-                            << e->retrieve_socket()->identify() << ": " << e->what() << std::endl;
-                    }
+                    std::cerr << ++open_connections << " open connections" << std::endl;
+                    // Spin off a thread for every session
+                    std::thread([this, session, &open_connections](){
+                        /* Ooops! Assume session lasts forever and is blocking.
+                         * Should a select(), or put this in a thread (and some shutdown logic)
+                         */
+                        try
+                        {
+                            while(session->process_incoming()) {} 
+                        }
+                        catch (std::unique_ptr<SocksException>&& e)
+                        {
+                            std::cerr << "Something went terrible wrong; I'm dropping the connection and printing out the error message:\n" << e->what() << std::endl;
+                        }
+                        catch (std::unique_ptr<jelford::SocketException>&& e)
+                        {
+                            std::cerr << "Socket problem: "
+                                << e->retrieve_socket()->identify() << ": " << e->what() << std::endl;
+                        }
 
-                    std::cerr << "Finished socks request on socket " << m_listen_socket.identify() << std::endl;
+                        std::cerr << "Finished socks request on socket " << m_listen_socket.identify() << std::endl;
+
+                        std::cerr << --open_connections << " open connections" << std::endl;
+                    }).detach();
                 }
             }
     };

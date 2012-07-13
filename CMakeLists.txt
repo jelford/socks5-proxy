@@ -9,6 +9,7 @@ add_definitions("-std=c++11")
 add_definitions("-Wall")
 add_definitions("-pedantic")
 add_definitions("-g")
+add_definitions("-pg")
 
 # Include the Sockets submodule
 include_directories ("${PROJECT_SOURCE_DIR}"Sockets/include/)
@@ -18,4 +19,4 @@ add_subdirectory (Sockets)
 #add_subdirectory (socks)
 
 add_executable (socks-proxy main.cpp)
-target_link_libraries (socks-proxy Sockets)
+target_link_libraries (socks-proxy Sockets pthread)
