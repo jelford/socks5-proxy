@@ -8,6 +8,8 @@
 
 #include <memory>           // std::unique_ptr, which I'm using (and shouldn't be!) for exceptions.
 
+#include <arpa/inet.h>      // inet_ntoa
+
 namespace socks
 {
     namespace managers
@@ -50,36 +52,30 @@ namespace socks
             private:
                 std::shared_ptr<jelford::Address> addr_for_request(const unsigned char type, const std::vector<unsigned char> address, const std::vector<unsigned char> port)
                 {
-                    /*sockaddr_storage addr;
-                    sockaddr_storage* addr_ptr = &addr;
-                    switch(type)
+                    switch (type)
                     {
                         case addr_type::IPV4:
                         {
-                            // Sorry! sockaddr_storage is big enough to hold either
-                                an inet4 or inet6 address, but isn't a plain-old union
-                                type. So reinterpret_casts ahoy. //
-                            sockaddr_in* ipv4_addr = reinterpret_cast<sockaddr_in*>(addr_ptr);
-                            ipv4_addr->sin_family = AF_INET;
-                            ipv4_addr->sin_port = static_cast<unsigned short>(*(&port[0]));
-                            ipv4_addr->sin_addr = *(in_addr*)(&address[0]);
-                            return std::shared_ptr<jelford::Address>(new jelford::Address(*ipv4_addr));
-                        }
-                        case addr_type::DOMAIN_NAME:
-                        {
-                            throw std::unique_ptr<SocksException>(new SocksException("Address by domain name unimplemented"));
-                        }
-                        case addr_type::IPV6:
-                        {
-                            throw std::unique_ptr<SocksException>(new SocksException("IPV6 addresses unimplemented"));
+                            std::cerr << "Trying to put ";
+                            for(auto i : address)
+                                std::cerr << (unsigned short)i << (i != address.back() ? "." : "");
+                            std::cerr << ":";
+                            std::cerr << (unsigned short)port[0] << (unsigned short)port[1] << " into a sockaddr_in" << std::endl;
+
+                            std::unique_ptr<sockaddr> address_structure(new sockaddr());
+                            auto addr_ipv4 = reinterpret_cast<sockaddr_in*>(address_structure.get());
+                            
+                            memcpy(&(addr_ipv4->sin_addr), &address[0], sizeof(addr_ipv4->sin_addr));
+                            memcpy(&(addr_ipv4->sin_port), &port[0], sizeof(addr_ipv4->sin_port));
+                            addr_ipv4->sin_family = AF_INET;
+
+                            return std::shared_ptr<jelford::Address>(
+                                new jelford::Address(
+                                    std::move(address_structure), sizeof(*addr_ipv4), 0, AF_INET));
                         }
                         default:
-                            throw std::unique_ptr<SocksException>(new SocksException("Unknown address type"));
+                            throw jelford::AddressException(0,0);
                     }
-                    */
-                    addrinfo hints;
-                    memset(&hints, 0, sizeof(hints));
-                    return std::shared_ptr<jelford::Address>(new jelford::Address("127.0.0.1", "5600", hints));
                 }
 
                 void set_next_session_state(Session* session, unsigned char command)
