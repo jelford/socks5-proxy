@@ -1,0 +1,3 @@
+[submodule "Sockets.hpp"]
+	path = Sockets.hpp
+	url = https://github.com/jelford/Sockets.hpp.git
