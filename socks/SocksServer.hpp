@@ -50,7 +50,7 @@ namespace socks
             void serve()
             {
                 int open_connections = 0;
-                while(true)
+                for(int i=0; i<50; ++i)
                 {
                     std::cerr << "Awaiting socks request..." << std::endl;
                     std::shared_ptr<SocksSession<Socket>> session(new SocksSession<Socket>(m_listen_socket.accept(NULL, NULL),
