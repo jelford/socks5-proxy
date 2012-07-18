@@ -41,7 +41,11 @@ namespace socks
                 std::vector<unsigned char> data(m_buffer->begin(), m_buffer->end());
                 std::deque<unsigned char> empty;
                 m_buffer->swap(empty);
+
+                // TODO: This can block forever. Should construct a way to ensure we only
+                // end of here if the destination is ready for write anyway.
                 wait_for_write(m_destination.get());
+
                 try
                 {
                     m_destination->write(data);
