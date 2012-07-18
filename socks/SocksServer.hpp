@@ -1,88 +1,124 @@
-#ifndef SOCKS_SERVER_HPP
-#define SOCKS_SERVER_HPP
+#ifndef SOCKS_SOCKSSERVERHPP
+#define SOCKS_SOCKSSERVERHPP
 
-#include "socks.hpp"
-#include "SocksSession.hpp"
-#include "factories/Socks5InitialSessionStateFactory.hpp"
-#include "state_managers/Socks5InitialHandshakeManager.hpp"
-#include "state_managers/Socks5NoAuthHandshakeManager.hpp"
-#include "state_managers/Socks5IncomingConnectinoRequestsManager.hpp"
-#include "state_managers/Socks5EstablishRemoteConnectionManager.hpp"
-#include "state_managers/Socks5TunnelManager.hpp"
 
-#include <memory>           // std::shared_ptr, std::unique_ptr
-#include <thread>           // std::thread
+#include <memory>               // std::unique_ptr, std::shared_ptr
+#include <map>                  // std::map
+#include <set>                  // std::set
+
+#include <Socket.hpp>           // jelford::Socket
+
+#include "SocksSessionState.hpp"    // socks::SocksSessionState
+#include "SocksListenState.hpp"     // socks::ListenState
+
+#include <iostream>             // std::cerr
 
 namespace socks
 {
-    
-
-    template <typename Socket>
-    class SocksServer {
+    class SocksServer
+    {
         private:
-            Socket m_listen_socket;
-            std::shared_ptr<factories::Socks5InitialSessionStateFactory<SocksSession<Socket>, 
-                    Socket,
-                    managers::Socks5InitialHandshakeManager<SocksSession<Socket>, Socket>,
-                    managers::Socks5NoAuthHandshakeManager<SocksSession<Socket>, Socket>,
-                    managers::Socks5IncomingConnectionRequestsManager<SocksSession<Socket>, Socket>,
-                    managers::Socks5EstablishRemoteConnectionManager<SocksSession<Socket>, Socket>,
-                    managers::Socks5TunnelManager<SocksSession<Socket>, Socket>
-                >
-            >
-                        m_initial_state_factory;
+            std::shared_ptr<jelford::Socket> m_wrapped_socket;
+            ListenState m_connection_listener;
+            std::map<int, std::shared_ptr<SessionState>> m_socks_sessions;
+            std::set<std::shared_ptr<jelford::Socket>> m_known_sockets;
 
         public:
-            SocksServer(Socket&& listen_socket) : 
-                m_listen_socket(std::move(listen_socket)),
-                m_initial_state_factory(new factories::
-                    Socks5InitialSessionStateFactory<
-                        SocksSession<Socket>, 
-                        Socket,
-                        managers::Socks5InitialHandshakeManager<SocksSession<Socket>, Socket>,
-                        managers::Socks5NoAuthHandshakeManager<SocksSession<Socket>, Socket>,
-                        managers::Socks5IncomingConnectionRequestsManager<SocksSession<Socket>, Socket>,
-                        managers::Socks5EstablishRemoteConnectionManager<SocksSession<Socket>, Socket>,
-                        managers::Socks5TunnelManager<SocksSession<Socket>, Socket>
-                    >())
-            { }
-            
+            SocksServer(std::shared_ptr<jelford::Socket> wrapped_socket)
+                : m_wrapped_socket(wrapped_socket)
+            {
+                m_wrapped_socket->set_nonblocking(true);
+                m_known_sockets.insert(m_wrapped_socket);
+            }
+
             void serve()
             {
-                int open_connections = 0;
-                for(int i=0; i<50; ++i)
+                try
                 {
-                    std::cerr << "Awaiting socks request..." << std::endl;
-                    std::shared_ptr<SocksSession<Socket>> session(new SocksSession<Socket>(m_listen_socket.accept(NULL, NULL),
-                                                    m_initial_state_factory));
+                    std::set<std::shared_ptr<SessionState>> dirty_sessions;
+                    while(true)
+                    {
+                        std::cerr << "Checking " << m_known_sockets.size() << " sockets for read data: [";
+                        for (auto s : m_known_sockets)
+                            std::cerr << s->identify() << ", ";
+                        std::cerr << "]" << std::endl;
 
-                    std::cerr << ++open_connections << " open connections" << std::endl;
-                    // Spin off a thread for every session
-                    std::thread([this, session, &open_connections](){
-                        /* Ooops! Assume session lasts forever and is blocking.
-                         * Should a select(), or put this in a thread (and some shutdown logic)
-                         */
-                        try
+                        auto sockets_with_read_data = select_for_reading(m_known_sockets);
+
+                        for (auto r_socket : sockets_with_read_data)
                         {
-                            while(session->process_incoming()) {} 
-                        }
-                        catch (std::unique_ptr<SocksException>&& e)
-                        {
-                            std::cerr << "Something went terrible wrong; I'm dropping the connection and printing out the error message:\n" << e->what() << std::endl;
-                        }
-                        catch (std::unique_ptr<jelford::SocketException>&& e)
-                        {
-                            std::cerr << "Socket problem: "
-                                << e->retrieve_socket()->identify() << ": " << e->what() << std::endl;
+                            if (r_socket == m_wrapped_socket)
+                            {
+                                auto new_mapping = m_connection_listener.start_new_session(r_socket);
+                                for (auto s : new_mapping)
+                                {
+                                    auto socket = std::get<0>(s);
+                                    auto session = std::get<1>(s);
+                                    m_socks_sessions[socket->identify()] = session;
+                                    m_known_sockets.insert(socket);
+                                    session->handle_incoming_data();
+                                    dirty_sessions.insert(session);
+                                }
+                            }
+                            else
+                            {
+                                auto session = m_socks_sessions[r_socket->identify()];
+                                try
+                                {
+                                    session->handle_incoming_data();
+                                    dirty_sessions.insert(session);
+                                }
+                                catch (std::unique_ptr<jelford::SocketException>&& e)
+                                {
+                                    std::cerr << "Some problem trying to read data:" << std::endl; 
+                                    std::cerr << e->what() << std::endl;
+                                }
+                            }
                         }
 
-                        std::cerr << "Finished socks request on socket " << m_listen_socket.identify() << std::endl;
+                        
+                        while (dirty_sessions.size() > 0)
+                        {
+                            auto tmp = dirty_sessions;
+                            for (auto d_session : tmp)
+                            {
+                                dirty_sessions.erase(d_session);
+                                auto new_mapping = d_session->consume_buffer();
 
-                        std::cerr << --open_connections << " open connections" << std::endl;
-                    }).detach();
+                                bool had_removals = false;
+                                for (auto mapping : new_mapping)
+                                {
+                                    std::shared_ptr<jelford::Socket> sock;
+                                    std::shared_ptr<SessionState> state;
+                                    std::tie(sock, state) = mapping;
+                                    if (state.get() == NULL)
+                                    {
+                                        m_known_sockets.erase(sock);
+                                        m_socks_sessions.erase(sock->identify());
+                                        had_removals = true;
+                                    }
+                                    else
+                                    {
+                                        m_socks_sessions[sock->identify()] = state;
+                                        m_known_sockets.insert(sock);
+                                        dirty_sessions.insert(state);
+                                    }
+                                }
+                                if (had_removals)
+                                    break;
+                            }
+                        }
+                    }
+                }
+                catch (std::unique_ptr<jelford::SocketException>&& e)
+                {
+                    std::cerr << "Problem in Socket[" << e->retrieve_socket()->identify() << "]" << std::endl;
+                    std::cerr << e->what() << std::endl;
                 }
             }
     };
 }
 
+
 #endif
+
