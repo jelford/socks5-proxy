@@ -26,17 +26,14 @@ namespace socks
 
             virtual std::string identify() { return "ProcessIPv4AddressState"; }
 
-            virtual std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>>
+            virtual decltype(m_no_change)
             consume_buffer()
             {
                 std::cerr << "ProcessIPv4AddressState::handle_incoming_data()" << std::endl;
                 std::cerr << "(buffer size: " << m_buffer->size() << ")" << std::endl;
 
                 if (m_buffer->size() < 6)
-                {
-                    std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> no_change{};
-                    return no_change;
-                }
+                    return m_no_change;
                
                 std::unique_ptr<sockaddr> address(new sockaddr());
                 
@@ -56,8 +53,9 @@ namespace socks
                 std::shared_ptr<jelford::Address> outgoing_address(new jelford::Address(std::move(address), size, protocol, family));
                 
                 auto command_process_state = m_command_process_state_factory->set_address(outgoing_address);
-
-                return std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>>{std::make_tuple(m_socket, command_process_state)};
+            
+                std::set<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> read_mappings{std::make_tuple(m_socket, command_process_state)};
+                return std::tie(read_mappings, m_no_write, m_no_exceptions);
             }
     };
 
@@ -73,12 +71,12 @@ namespace socks
 
             virtual std::string identify() { return "ProcessDomainAddressState"; }
 
-            virtual std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>>
+            virtual decltype(m_no_change)
             consume_buffer()
             {
                 std::cerr << "DOMAIN ADDRESS TYPE NOT YET SUPPORTED! Oh dear..." << std::endl;
 
-                return std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>>{};
+                return m_no_change;
             }
 
     };

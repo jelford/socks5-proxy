@@ -29,17 +29,14 @@ namespace socks
 
             virtual std::string identify() { return "AcceptCommandState"; }
 
-            virtual std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>>
+            virtual decltype(m_no_change)
             consume_buffer()
             {
                 std::cerr << "AcceptCommandState::handle_incoming_data()" << std::endl;
                 std::cerr << "(buffer size: " << m_buffer->size() << ")" << std::endl;
 
                 if (m_buffer->size() < 4)
-                {
-                    std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> no_change{};
-                    return no_change;
-                }
+                    return m_no_change;
 
                 /* auto version = m_buffer->front(); */
                 m_buffer->pop_front();
@@ -86,10 +83,10 @@ namespace socks
                         break;
                 }
                 
-                std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> listen_list = {
+                std::set<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> listen_list = {
                     std::make_tuple(m_socket, process_address_state)
                 };
-                return listen_list;
+                return std::tie(listen_list, m_no_write, m_no_exceptions);
             }
     };
 }

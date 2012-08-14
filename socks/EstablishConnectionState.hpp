@@ -28,7 +28,7 @@ namespace socks
             virtual std::string identify() { return "EstablishConnectionState"; }
 
             
-            virtual std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>>
+            virtual decltype(m_no_change)
             consume_buffer()
             {
                 std::shared_ptr<jelford::Socket> outgoing_traffic(new jelford::Socket(m_address->family, ::SOCK_STREAM, m_address->protocol));
@@ -62,11 +62,11 @@ namespace socks
 
                 std::cerr << "Incoming/Outgoing on " << m_socket->identify() << "/" << outgoing_traffic->identify() << std::endl;
 
-                std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> mappings{
+                std::set<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> read_mappings{
                     std::make_tuple(m_socket, outgoing_traffic_handler),
                     std::make_tuple(outgoing_traffic, incoming_traffic_handler)
                 };
-                return mappings;
+                return std::tie(read_mappings, m_no_write, m_no_exceptions);
             }
     };
 }

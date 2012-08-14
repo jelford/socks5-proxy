@@ -23,7 +23,7 @@ namespace socks
 
             virtual std::string identify() { return "HandshakeState"; }
 
-            virtual std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>>
+            virtual decltype(m_no_change)
             consume_buffer()
             {
 
@@ -31,10 +31,7 @@ namespace socks
                 std::cerr << "buffer size: " << m_buffer->size() << " }" << std::endl;
 
                 if (m_buffer->size() < 1)
-                {
-                    std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> no_change{};
-                    return no_change;
-                }
+                    return m_no_change;
 
                 // buffer.size >= 1
                 
@@ -43,10 +40,10 @@ namespace socks
                 std::cerr << "SOCKS PROTOCOL V" << static_cast<short>(protocol) << std::endl;
                 std::shared_ptr<socks::AuthHandshakeState> auth_handshake_state(new AuthHandshakeState(m_socket, m_buffer));
 
-                std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> listen_list = {
+                std::set<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> listen_list = {
                     std::make_tuple(m_socket, auth_handshake_state)
                 };
-                return listen_list;
+                return std::tie(listen_list, m_no_write, m_no_exceptions);
             }
     };
 }

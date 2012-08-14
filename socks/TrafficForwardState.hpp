@@ -30,44 +30,35 @@ namespace socks
             virtual std::string identify() 
             { 
                 std::stringstream s;
-                s << "TrafficForwardState[" << m_socket->identify() << "]"; 
+                s << "TrafficForwardState[" << m_socket->identify() << "->" << m_destination->identify() << "]"; 
                 return s.str();
             }
             
-            virtual std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>>
+            virtual decltype(m_no_change)
             consume_buffer()
             {
-                bool error = false;
-                std::vector<unsigned char> data(m_buffer->begin(), m_buffer->end());
+                std::shared_ptr<std::vector<unsigned char>> data(new std::vector<unsigned char>(m_buffer->begin(), m_buffer->end()));
                 std::deque<unsigned char> empty;
                 m_buffer->swap(empty);
 
-                // TODO: This can block forever. Should construct a way to ensure we only
-                // end of here if the destination is ready for write anyway.
-                wait_for_write(m_destination.get());
+                decltype(m_no_read) read_mappings;
+                decltype(m_no_write) write_mappings;
 
-                try
+                if (data->size() == 0 && m_data_sent)
                 {
-                    m_destination->write(data);
+                    read_mappings.insert(
+                        {
+                            std::make_tuple(m_socket, std::shared_ptr<SessionState>(NULL)), 
+                            std::make_tuple(m_destination, std::shared_ptr<SessionState>(NULL))
+                        });
+                    write_mappings.insert(std::make_tuple(m_destination, std::shared_ptr<std::vector<unsigned char>>(new std::vector<unsigned char>())));
                 }
-                catch (std::unique_ptr<jelford::SocketException>&& e)
-                {
-                    auto s = e->retrieve_socket();
-                    std::cerr << s->identify() << ": Problem forwarding data: " << e->what() << std::endl;
-                    error = true;
-                }
+                else if (data->size() > 0 || m_data_sent)
+                    write_mappings.insert(std::make_tuple(m_destination, data));
 
-                std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> mappings;
-                if ((data.size() == 0 && m_data_sent) || error)
-                {
-                    mappings.push_back(std::make_tuple(m_destination, std::shared_ptr<SessionState>(NULL)));
-                    mappings.push_back(std::make_tuple(m_socket, std::shared_ptr<SessionState>(NULL)));
-                }
-                    
                 m_data_sent = true;
-                return mappings;
 
-                
+                return std::tie(read_mappings, write_mappings, m_no_exceptions);
 
             }
     };

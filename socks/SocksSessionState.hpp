@@ -17,13 +17,24 @@ namespace socks
         protected:
             std::shared_ptr<jelford::Socket> m_socket;
             std::shared_ptr<std::deque<unsigned char>> m_buffer;
-    
+
+            std::set<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> m_no_read;
+            std::set<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<std::vector<unsigned char>>>> m_no_write;
+            std::set<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> m_no_exceptions;
+
+            std::tuple<
+                decltype(m_no_read), 
+                decltype(m_no_write), 
+                decltype(m_no_exceptions)> 
+                    m_no_change;
+
+   
         public:
             SessionState(std::shared_ptr<jelford::Socket> socket, std::shared_ptr<std::deque<unsigned char>> buff)
                 : m_socket(socket), m_buffer(buff)
             { }
 
-            virtual std::vector<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>>
+            virtual decltype(m_no_change)
             consume_buffer()=0;
 
             virtual std::string identify()=0;
