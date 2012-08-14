@@ -62,17 +62,15 @@ namespace socks
                 if (!no_auth_found)
                     std::cerr << "Client isn't going to like no_auth..." << std::endl;
 
-                std::vector<unsigned char> no_auth_reply{0x05, 0x00};
-                m_socket->write(no_auth_reply);
+                std::shared_ptr<std::vector<unsigned char>> no_auth_reply(new std::vector<unsigned char>({0x05, 0x00}));
 
                 std::cerr << "Sent no-auth reply" << std::endl;
 
                 std::shared_ptr<socks::AcceptCommandState> command_accept_state(new AcceptCommandState(m_socket, m_buffer));
 
-                std::set<std::tuple<std::shared_ptr<jelford::Socket>, std::shared_ptr<SessionState>>> listen_list{
-                    std::make_tuple(m_socket, command_accept_state)
-                };
-                return std::tie(listen_list, m_no_write, m_no_exceptions);
+                decltype(m_no_read) listen_list {std::make_tuple(m_socket, command_accept_state)};
+                decltype(m_no_write) write_list {std::make_tuple(m_socket, no_auth_reply)};
+                return std::tie(listen_list, write_list, m_no_exceptions);
             }
     };
 }
